@@ -9,7 +9,7 @@
 #
 # Data   : 18/06/2025
 ###############################################################################
-from arvore import HuffmanNode
+from arvore import HuffmanNode, HuffmanTree
 
 class HuffmanCompacter:
     """
@@ -46,7 +46,7 @@ class HuffmanCompacter:
         """
 
         match char:
-            case r'\n':
+            case '\n':
                 # Caractere de final de linha
                 return '<EOL>'
 
@@ -95,7 +95,6 @@ class HuffmanCompacter:
         """
         return dict(sorted(dictionary.items(), key=lambda item: item[1]))
             
-
     def create_huffman_tree(self, filename: str) -> HuffmanNode:
         """
         Cria uma arvóre de caracteres de Huffman para um determinado arquivo.
@@ -148,5 +147,8 @@ if __name__ == "__main__":
     filename = "teste.txt"
     compacter = HuffmanCompacter()
 
-    tree = compacter.create_huffman_tree(filename)
+    root = compacter.create_huffman_tree(filename)
+    tree = HuffmanTree(root)
+
+    tree.plot_tree()
 
