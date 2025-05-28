@@ -11,7 +11,7 @@
 ###############################################################################
 from arvore import HuffmanNode, HuffmanTree
 
-class HuffmanCompacter:
+class HuffmanCompactor:
     """
     Um código Huffman é um tipo específico de código de prefixo ótimo comumente
     usado para compressão de dados sem perdas. O processo de encontrar ou usar 
@@ -33,9 +33,14 @@ class HuffmanCompacter:
         por exemplo incluem a alteração do caractere '\n' que se não tratado
         como 'raw' ou com uma nova notação, quebra a saída.
 
+        Caso o caracter passado esteja na forma convertida, é retornado
+        o caractere sem a conversão.
+
         Exemplos de mudanças de notação:
-            :arg '\n' -> '<EOL>'
-            :arg ' '  -> '<Space>'
+            :arg '\n'      -> '<EOL>'
+            :arg ' '       -> '<Space>'
+            :arg '<EOL>'   -> '\n'
+            :arg '<Space>' -> ' '
 
         Caracteres comuns ou alfanuméricos não precisam de tratamento, por isso
         não recebem uma nova notação.
@@ -53,6 +58,12 @@ class HuffmanCompacter:
             case ' ':
                 # Torna o caracter mais vísivel
                 return '<Space>'
+
+            case '<EOL>':
+                return '\n'
+
+            case '<Space>':
+                return ' '
 
             case _:
                 return char
@@ -142,13 +153,64 @@ class HuffmanCompacter:
 
         return huffman_list[0]
 
+    def create_compactor_binary_file(self, filename: str, compact_filename: str, char_dict: dict):
+        """
+        Método para criar o arquivo binário compactado pelo algoritmo de 
+        Huffman. O arquivo compactado tem nome "filename" + ".huff" como 
+        extensão. O arquivo também é gerado automaticamente e, caso já exista
+        um arquivo de mesmo nome, ele é sobrescrito.
+
+        :param filename: Nome do arquivo a ser compactado.
+        """
+        compact_file = open(compact_filename, "w+")
+
+        with open(filename, "r") as raw_file:
+            for line in raw_file.readlines():
+                for char in line:
+                    char = self.__treat_char__(char)
+                    compact_file.write(char_dict[char])
+
+    def decompactor_file(self, compact_filename: str, decompact_filename: str, char_dict: dict):
+        decompact_file = open(decompact_filename, "w+")
+
+        inverted_dict: dict[str, str] = {value: key for key, value in char_dict.items()}
+
+        with open(compact_filename, "r") as compact_file:
+            code: str = ""
+
+            for bit in compact_file.read():
+                code += bit
+                if code in inverted_dict.keys():
+                    char: str = self.__treat_char__(inverted_dict[code]) 
+                    decompact_file.write(char)
+                    code = ""
+
 if __name__ == "__main__":
     # Área de Execução
-    filename = "teste.txt"
-    compacter = HuffmanCompacter()
+    filename : str  = input("Nome do arquivo a ser compactado (com a extensão): ")
+    print(f"Compactando arquivo {filename}\n")
+    compactor: HuffmanCompactor = HuffmanCompactor()
 
-    root = compacter.create_huffman_tree(filename)
-    tree = HuffmanTree(root)
+    root : HuffmanNode = compactor.create_huffman_tree(filename)
+    tree : HuffmanTree = HuffmanTree(root) # Cria a árvore de Huffman
+    char_dict: dict[str, str] = tree.create_char_dict() # Dicionário de caracteres e seu binário
 
-    tree.plot_tree()
+    print("Exibindo dicionario de caracteres e seus binários")
+
+    for key, value in char_dict.items():
+        print(f"{key}: {value}")
+
+    option = input("Exibir árvore de Huffman na horizontal (s/n): ")
+    
+    if option.lower() == "s":
+        tree.plot_tree(orientation="h")
+    elif option.lower() == "n":
+        tree.plot_tree(orientation="v")
+
+    compact_filename = input("Nome do arquivo final compactado: ")
+    decompact_filename = input("Nome do arquivo final descompactado: ")
+
+    compactor.create_compactor_binary_file(filename, compact_filename, char_dict)
+
+    compactor.decompactor_file(compact_filename, decompact_filename, char_dict)
 
