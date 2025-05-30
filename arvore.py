@@ -48,7 +48,7 @@ class HuffmanNode:
 
     def __gt__(self, object: Self) -> bool:
         """
-        Método interno da classe. Implementa o operador '>' 'Greater Then'
+        Método interno da classe. Implementa o operador '>' 'Greater Then'.
         """
         if self.frequency > object.frequency:
             return True
@@ -61,8 +61,14 @@ class HuffmanTree:
 
     def create_char_dict(self) -> dict[str, str]:
         """
-        Retorna um dicionário com os códigos (em binário) de Huffman para 
+        Retorna um dicionário com os códigos (em texto binário) de Huffman para 
         cada caractere encontrado no arquivo.
+        Importante ressaltar que o valor armazenado em cada chave é um texto
+        representando o valor em binário, não o próprio valor em binário.
+        
+        :return: Um dicionário onde as chaves são caracteres e os valores
+                 são uma representação de texto dos binários (não binários
+                 reais).
         """
         codes = dict()
         self._traverse_tree(self.root, "", codes)
@@ -70,11 +76,13 @@ class HuffmanTree:
 
     def _traverse_tree(self, node: HuffmanNode, current_code: str, codes: dict) -> None:
         """
-        Percorre a árvore recursivamente para construir os códigos.
-        Args:
-            node: Nó atual
-            current_code: Código acumulado até o momento
-            codes: Dicionário para armazenar os códigos encontrados
+        Percorre a árvore recursivamente para construir os códigos e o 
+        dicionário de caracteres.
+        O dicionário é criado por efeito colateral.
+
+        :param node: Nó atual da árvore.
+        :param current_code: Código acumulado até o momento.
+        :param codes: Dicionário para armazenar os códigos encontrados.
         """
         if node is None:
             return
@@ -93,10 +101,20 @@ class HuffmanTree:
     def plot_tree(self, orientation: str="h"):
         """
         Plota a árvore recursivamente, utilizando a biblioteca pptree,
-        começando pelo nó raiz.
+        começando pelo nó raiz. A árvore pode ser plotada horizontalmente
+        ou verticalmente.
+
+        :param orientation: Orientação da árvore. 'h': horizontal
+                                                  'v': vertical
         """
         pptree_root = convert_to_pptree(self.root)
 
+        #######################################################################
+        # Essa biblioteca tem alguma esquisitice com relação ao parâmetro
+        # horizontal.
+        # De alguma maneira, horizontal=True printa verticalmente, e 
+        # horizontal=False printa horizontalmente.
+        #######################################################################
         if orientation == "v":
             print_tree(pptree_root, horizontal=True)
         elif orientation == "h":
