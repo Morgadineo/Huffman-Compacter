@@ -9,6 +9,7 @@
 #
 # Data   : 18/06/2025
 ###############################################################################
+from io import BufferedIOBase
 from arvore import HuffmanNode, HuffmanTree
 from typing import Any
 import os
@@ -29,7 +30,6 @@ class HuffmanCompactor:
         pass
 
     ##-# Métodos Públicos #-###################################################
-
     def create_huffman_tree(self, filename: str) -> HuffmanNode:
         """
         Cria uma arvóre de caracteres de Huffman para um determinado arquivo.
@@ -59,21 +59,22 @@ class HuffmanCompactor:
         # possuir um valor que é a raiz da árvore.                            #
         #######################################################################
         while len(huffman_list) != 1:
+            # Ordena a lista
+            huffman_list.sort
             # Elemento de menor frequência na iteração.
-            element_1 = huffman_list.pop(0)
+            left = huffman_list.pop(0)
             # Elemento de segunda menor frequência da iteração.
-            element_2 = huffman_list.pop(0) 
+            right = huffman_list.pop(0) 
             
             ###################################################################
             # Nó pai, com valor de frequência como a soma da frequência das   #
             # subárvores                                                      #
             ###################################################################
-            new_node = HuffmanNode(frequency=(element_1.frequency + element_2.frequency),
-                                   left=element_1,
-                                   right=element_2,
+            new_node = HuffmanNode(frequency=(left.frequency + right.frequency),
+                                   left=left,
+                                   right=right,
                                    char=None)
             huffman_list.append(new_node)
-            huffman_list.sort()
 
         return huffman_list[0]
 
@@ -139,11 +140,10 @@ class HuffmanCompactor:
                     # Trata o caractere.
                     character: str = self.__treat_char__(character)
 
-                    if not character is '<EOL>':
-                        if character in char_dict:
-                            char_dict[character] += 1
-                        else:
-                            char_dict.update({character: 1})
+                    if character in char_dict:
+                        char_dict[character] += 1
+                    else:
+                        char_dict.update({character: 1})
                 
         return char_dict
 
@@ -155,30 +155,103 @@ class HuffmanCompactor:
         :param compact_filename: Nome do arquivo compactado a ser gerado.
         :param char_dict: Dicionário de caracteres do arquivo.
         """
-        with open(filename, "rb") as raw_file, open(compact_filename, "wb") as compact_file:
-            for line in raw_file.readlines():
-                for char in line:
-                    print(char)
+        print(f"Compactando {filename}...")
+
+        file_string: str = self.__transform_file_to_bstr__(filename, char_dict)
+
+        ###################################################################
+        # Conserta o ultimo byte do arquivo.
+        # "Relutei muito para saber se precisava disso, mas precisa sim."
+        #
+        # Como a leitura do arquivo compactado será feita pelo tamanho da
+        # palavra do processador (1 Byte) é necessário arredondar para
+        # evitar leitura lixo na descompactação. Aumenta o tamanho final.
+        ###################################################################
+        padding = 8 - (len(file_string) % 8)
+        if padding > 0:
+            file_string += "0" * padding
+            print(f"Padding: {padding}")
+
+        byte_array = bytearray()
+        byte_array.append(padding)
+
+        # Processa de 8 em 8 bits
+        for i in range(0, len(file_string), 8):
+            byte = file_string[i:i+8]
+            byte_array.append(int(byte, 2))
+        
+        # Escreve o conteúdo no arquivo binário
+        with open(compact_filename, "wb") as compact_file:
+            compact_file.write(byte_array)
+        print(f"\nArquivo gerado: {compact_filename}")
+
+    def decompact_file(self, compact_filename: str, decompact_filename: str, char_dict: dict):
+        """
+        Método para descompactar arquivos.
+
+        :param compact_filename: Nome do arquivo a ser descompactado.
+        :param decompact_filename: Nome do arquivo descompactado gerado.
+        :param char_dict: Dicionário de caracteres de huffman.
+        """
+        print(f"Descompactando...\n")
+        byte_content: bytes = bytes()
+        with open(compact_filename, "rb") as compact_file:
+            byte_content = compact_file.read()
+
+        bits_str_content: str = ''.join(f'{byte:08b}' for byte in byte_content)
+        
+        padding_byte = byte_content[0]
+
+        # Conteúdo bruto é antes da remoção do padding
+        print(f"Conteúdo bruto: \n{bits_str_content}\n")
+
+        #######################################################################
+        # Tratamento do 'padding'
+        #
+        # O primeiro byte é um binário para a quantidade de paddings no final.
+        # A linha abaixo faz o slice para remover o primeiro byte de padding e
+        # os bits no final.
+        #######################################################################
+        bits_str_content = bits_str_content[8:-padding_byte]
+
+        print(f"Conteúdo sem padding: \n{bits_str_content}\n")
+
+        inverted_dict: dict = {value: key for key, value in char_dict.items()}
+
+        with open(decompact_filename, "w+") as decompact_file:
+            bit_char = ""
+            for bit in bits_str_content:
+                bit_char += bit
+                if bit_char in inverted_dict:
+                    char = self.__treat_char__(inverted_dict[bit_char])
+                    decompact_file.write(char)
+                    bit_char = ""
+
+
+        print(f"\n{decompact_filename} criado")
 
     ##-# Métodos Privados #-###################################################
 
-    def __convert_dict_to_binary__(self, dictionary: dict[str, str]) -> dict[str, int]:
+    def __transform_file_to_bstr__(self, filename: str, char_dict: dict[str, str]) -> str:
         """
-        #-# Método Privado #-#
-        Converte o dicionário de caracteres (falso) para o dicionário real.
-        O dicionário é chamado de falso pois, em sua chave, armazena a 
-        representação string do binário, ao invés do valor inteiro binário (verdadeiro).
-        
-        Utilizando o dicionário falso para compactação, o arquivo gerado também é falsamente compactado, pois armazena
-        cada bit, como sendo um caractere Unicode UTF-8. Isso faz com que o arquivo falsamente compactado seja bem maior
-        que o original.
+        Método para transformar o conteúdo de um arquivo em uma string de bits.
+        Esse processo é necessário para que a criação do arquivo compactado
+        seja feita. O binário de cada caractere não é feito com base na tabela
+        ASCII ou Unicode, mas sim no dicionário de caracteres da árvore de 
+        huffman.
+
+        :param filename: Arquivo a transformado.
+
+        :return: Uma string com os binários relativos a árvore de huffman.
         """
-        binary_dict = dict()
+        file_string: str = str()
+        with open(filename, "r") as raw_file:
+            for line in raw_file.readlines():
+                for char in line:
+                    char = self.__treat_char__(char)
+                    file_string += char_dict[char]
 
-        for key, value in dictionary.items():
-            binary_dict.update({key: bin(int(value, 2))})
-
-        return binary_dict
+        return file_string
 
     def __order_dict__(self, dictionary: dict[str, int]) -> dict[str, int]:
         """
@@ -191,7 +264,7 @@ class HuffmanCompactor:
         """
         return dict(sorted(dictionary.items(), key=lambda item: item[1]))
 
-    def __treat_char__(self, char) -> str:
+    def __treat_char__(self, char: str) -> str:
         r"""
         Método para tratar caracteres especiais ou que dificultam a
         visualização na saída do terminal. Algumas das conversões realizadas, 
@@ -250,19 +323,27 @@ if __name__ == "__main__":
     compact_filename = "teste_compact.huff"
     decompact_filename = "teste_decompact.huff"
 
+    # Compactador
     compactor: HuffmanCompactor = HuffmanCompactor()
 
+    print(f"======> Criação da árvore <===============")
     root : HuffmanNode = compactor.create_huffman_tree(filename)
     tree : HuffmanTree = HuffmanTree(root) # Cria a árvore de Huffman
-    char_dict: dict[str, str] = tree.create_char_dict() # Dicionário de caracteres e seu binário
-
-    print_dict(char_dict)
-
     tree.plot_tree(orientation="v")
 
+    print(f"\n======> Dicionário do arquivo <===========")
+    char_dict: dict[str, str] = tree.create_char_dict() # Dicionário de caracteres e seu binário
+    print_dict(char_dict)
+    
+    print(f"\n======> Compactação falsa <===============\n")
     compactor.create_fake_compacted_file(filename, fake_compact_filename, char_dict)
+    
+    print(f"\n======> Descompactação falsa <============\n")
     compactor.decompactor_fake_file(fake_compact_filename, fake_decompact_filename, char_dict)
 
-    print("Usando compactação real")
-
+    print(f"\n======> Processo de Compactação <=========")
     compactor.create_compacted_file(filename, compact_filename, char_dict)
+
+    print(f"\n======> Processo de Descompactação <======")
+    compactor.decompact_file(compact_filename, decompact_filename, char_dict)
+

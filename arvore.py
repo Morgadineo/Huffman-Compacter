@@ -37,7 +37,6 @@ class HuffmanNode:
             return str(self.frequency)
         return self.char
 
-
     def __lt__(self, object: Self) -> bool:
         """
         Método interno da classe. Implementa o operador '<' 'Less Then'
